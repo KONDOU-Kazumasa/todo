@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "TODO App",
-  description: "A simple TODO app built with Next.js and Prisma",
+  description: "A simple TODO app built with Next.js",
 };
 
 export default function RootLayout({

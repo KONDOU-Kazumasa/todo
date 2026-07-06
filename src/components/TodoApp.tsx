@@ -3,71 +3,51 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 type Todo = {
-  id: number;
+  id: string;
   title: string;
   done: boolean;
   createdAt: string;
 };
 
+const STORAGE_KEY = "todos";
+
 export default function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [title, setTitle] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/todos")
-      .then((res) => res.json())
-      .then((data) => setTodos(data))
-      .catch(() => setError("Failed to load todos"))
-      .finally(() => setLoading(false));
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) setTodos(JSON.parse(stored));
+    setLoaded(true);
   }, []);
 
-  async function handleAdd(e: FormEvent) {
+  useEffect(() => {
+    if (loaded) localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+  }, [todos, loaded]);
+
+  function handleAdd(e: FormEvent) {
     e.preventDefault();
     const trimmed = title.trim();
     if (!trimmed) return;
 
-    const res = await fetch("/api/todos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: trimmed }),
-    });
-
-    if (!res.ok) {
-      setError("Failed to add todo");
-      return;
-    }
-
-    const todo = await res.json();
+    const todo: Todo = {
+      id: crypto.randomUUID(),
+      title: trimmed,
+      done: false,
+      createdAt: new Date().toISOString(),
+    };
     setTodos((prev) => [todo, ...prev]);
     setTitle("");
   }
 
-  async function toggleDone(todo: Todo) {
-    const res = await fetch(`/api/todos/${todo.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !todo.done }),
-    });
-
-    if (!res.ok) {
-      setError("Failed to update todo");
-      return;
-    }
-
-    const updated = await res.json();
-    setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  function toggleDone(id: string) {
+    setTodos((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
+    );
   }
 
-  async function deleteTodo(id: number) {
-    const res = await fetch(`/api/todos/${id}`, { method: "DELETE" });
-
-    if (!res.ok) {
-      setError("Failed to delete todo");
-      return;
-    }
-
+  function deleteTodo(id: string) {
     setTodos((prev) => prev.filter((t) => t.id !== id));
   }
 
@@ -95,17 +75,11 @@ export default function TodoApp() {
         </button>
       </form>
 
-      {error && (
-        <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>
-      )}
-
       <ul className="mt-6 flex flex-col gap-2">
-        {loading ? (
+        {!loaded ? (
           <li className="text-sm text-zinc-500">読み込み中...</li>
         ) : todos.length === 0 ? (
-          <li className="text-sm text-zinc-500">
-            タスクはまだありません
-          </li>
+          <li className="text-sm text-zinc-500">タスクはまだありません</li>
         ) : (
           todos.map((todo) => (
             <li
@@ -115,7 +89,7 @@ export default function TodoApp() {
               <input
                 type="checkbox"
                 checked={todo.done}
-                onChange={() => toggleDone(todo)}
+                onChange={() => toggleDone(todo.id)}
                 className="size-4 shrink-0 accent-zinc-900 dark:accent-zinc-50"
               />
               <span
@@ -140,7 +114,7 @@ export default function TodoApp() {
         )}
       </ul>
 
-      {!loading && todos.length > 0 && (
+      {loaded && todos.length > 0 && (
         <p className="mt-4 text-xs text-zinc-500">
           残り {remaining} / {todos.length} 件
         </p>
